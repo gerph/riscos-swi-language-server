@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+"""
+RISC OS SWI language server.
+
+We implement a Language Server to look up RISC OS SWI calls.
+"""
+
 import logging
 import re
 import subprocess
@@ -12,8 +18,8 @@ from pygls.workspace import TextDocument
 server = LanguageServer("riscos-swis", "v1")
 
 #print = lambda msg: server.log_trace(params=types.LogTraceParams(msg))
-#print = lambda msg: server.window_log_message(params=types.LogMessageParams(types.MessageType.Info,msg))
-#print = lambda msg: logging.info(msg)
+#print = lambda msg: server.window_log_message(params=types.LogMessageParams(types.MessageType.debug,msg))
+#print = lambda msg: logging.debug(msg)
 
 swi_match_left_re = re.compile(r'X?[A-Z][A-Za-z0-9_]*$')
 swi_match_right_re = re.compile(r'^[A-Za-z0-9_]*')
@@ -37,6 +43,48 @@ swi_before_re = re.compile(r'(^|\s)SWI(EQ|NE|CS|CC|MI|PL|VS|VC|HI|LS|GE|LT|GT|LE
 swi_asm_re = re.compile(r'^(?:(\$?[A-Za-z0-9_]+):?)?\s+([A-Za-z_]+)(.*)')
 swi_comment_re = re.compile(r'^(.*) (;|//) ?(.*)')
 
+swi_reason_code_register = {
+    'ADFS_PowerControl': 0,
+    'DeviceFS_CallDevice': 0,
+    'FileCore_DiscOp': 1,
+    'FileCore_MiscOp': 0,
+    'FilerAction_SendStartOperation': 1,
+    'OS_Byte': 0,
+    'OS_Args': 0,
+    'OS_DynamicArea': 0,
+    'OS_File': 0,
+    'OS_Find': 0,
+    'OS_FSControl': 0,
+    'OS_GBPB': 0,
+    'OS_Heap': 0,
+    'OS_Memory': 0,
+    'OS_MMUControl': 0,
+    'OS_Module': 0,
+    'OS_Pointer': 0,
+    'OS_ReadDefaultHandler': 0,
+    'OS_ReadSysInfo': 0,
+    'OS_ScreenMode': 0,
+    'OS_SerialOp': 0,
+    'OS_ServiceCall': 1,
+    'OS_SpriteOp': 0,
+    'OS_UpCall': 0,
+    'OS_Word': 0,
+    'Parallel_Op': 0,
+    'PDriver_MiscOpForDriver': 0,
+    'PDumper_TidyJob': 2,
+    'Portable_CommandBMU': 0,
+    'Sound_LinearHandler': 0,
+    'Sound_Mode': 0,
+    'Sound_SampleRate': 0,
+    'TaskWindow_TaskInfo': 0,
+    'Territory_ConvertTimeStringToOrdinals': 1,
+    'Territory_ReadSymbols': 1,
+    'Wimp_RegisterFilter': 0,
+    'Wimp_SpriteOp': 0,
+    'Wimp_TextOp': 0,
+}
+
+
 class SWICall:
     # Seconds to get the PRM information
     process_timeout = 5
@@ -51,8 +99,8 @@ class SWICall:
         before = line[:start_pos]
         after = line[end_pos:]
 
-        logging.info("Text before SWI: '%s'" % (before,))
-        logging.info("Text after SWI: '%s'" % (after,))
+        logging.debug("Text before SWI: '%s'" % (before,))
+        logging.debug("Text after SWI: '%s'" % (after,))
         if swix_before_re.search(before):
             self.decode_swix(document, before, after)
         if sys_before_re.search(before):
@@ -63,11 +111,11 @@ class SWICall:
     def decode_swi(self, document: TextDocument, pos: types.Position, before: str, after: str):
         # We can extract the registers that were supplied and those returned
         # but we will ignore any flags.
-        logging.info("Is a SWI call (assembler)")
+        logging.debug("Is a SWI call (assembler)")
         nlines = 20
         for linenum in range(pos.line - 1, pos.line - nlines, -1):
             line = document.lines[linenum].rstrip()
-            logging.info("Line #%i: %s" % (linenum, line))
+            logging.debug("Line #%i: %s" % (linenum, line))
             match = swi_comment_re.search(line)
             comment = None
             if match:
@@ -78,17 +126,17 @@ class SWICall:
                 label = match.group(1)
                 mnemonic = match.group(2)
                 rest = match.group(3).strip()
-                logging.info("  Mnemonic = %s" % (mnemonic,))
+                logging.debug("  Mnemonic = %s" % (mnemonic,))
 
     def decode_sys(self, document: TextDocument, before: str, after: str):
         # We can extract the registers that were supplied and those returned
         # but we will ignore any flags.
-        logging.info("Is a SYS call (BASIC)")
+        logging.debug("Is a SYS call (BASIC)")
         if after and after[0] == '"':
             after = after[1:]
         params = after.lstrip()
         if params and params[0] == ',':
-            logging.info("We know the parameters")
+            logging.debug("We know the parameters")
             params = params[1:].lstrip()
             rn = 0
             type_input = True
@@ -114,11 +162,11 @@ class SWICall:
                         else:
                             expr = '0'
                         self.rin_value[rn] = expr
-                        logging.info("  In: r%i = %s" % (rn, expr))
+                        logging.debug("  In: r%i = %s" % (rn, expr))
                     else:
                         if expr:
                             self.rout_expect[rn] = expr
-                            logging.info(" Out: %s = r%i" % (expr, rn))
+                            logging.debug(" Out: %s = r%i" % (expr, rn))
                     rn += 1
                     if sep == ':' or sep == ';':
                         break
@@ -133,15 +181,15 @@ class SWICall:
         # We can extract the registers that were supplied and those returned
         # but we will ignore any flags or block usage. At present we only handle
         # a single line of statement.
-        logging.info("Is a _swix/_swi call")
+        logging.debug("Is a _swix/_swi call")
         match = swix_after_re.search(after)
         if match:
-            logging.info("We know the parameters")
+            logging.debug("We know the parameters")
             flags = match.group(1)
-            logging.info("Flags: %s" % (flags,))
+            logging.debug("Flags: %s" % (flags,))
             params_pos = match.end()
             params = after[params_pos:]
-            logging.info("Params: %s" % (params,))
+            logging.debug("Params: %s" % (params,))
             self.rin_supplied = {}
             self.rout_supplied = {}
             for part in re.split('[|+]', flags):
@@ -183,10 +231,10 @@ class SWICall:
                             self.rout_supplied[rn] = True
                     continue
 
-                logging.info("Not recognised: '%s'" % (part,))
+                logging.debug("Not recognised: '%s'" % (part,))
 
-            logging.info("InRegs: %s" % (sorted(self.rin_supplied.keys()),))
-            logging.info("OutRegs: %s" % (sorted(self.rout_supplied.keys()),))
+            logging.debug("InRegs: %s" % (sorted(self.rin_supplied.keys()),))
+            logging.debug("OutRegs: %s" % (sorted(self.rout_supplied.keys()),))
 
             # Now work out what the parameters are...
             args = []
@@ -203,12 +251,12 @@ class SWICall:
                         break
                 else:
                     break
-            logging.info("Args: %s" % (args,))
+            logging.debug("Args: %s" % (args,))
             for r in sorted(self.rin_supplied.keys()):
                 if args:
                     value = args.pop(0)
                     self.rin_value[r] = value
-                    logging.info("  In: r%i = %s" % (r, value))
+                    logging.debug("  In: r%i = %s" % (r, value))
                 else:
                     break
             for r in sorted(self.rout_supplied.keys()):
@@ -219,7 +267,7 @@ class SWICall:
                     else:
                         value = '*' + value
                     self.rout_expect[r] = value
-                    logging.info("  Out: %s = r%i" % (value, r))
+                    logging.debug("  Out: %s = r%i" % (value, r))
                 else:
                     break
 
@@ -232,7 +280,26 @@ class SWICall:
         @return:    None if no content could be read
                     markdown text for the SWI
         """
-        proc = subprocess.run(["riscos-prm", "--summary", "--no-tables", self.name],
+        name = self.name
+        reason_register = swi_reason_code_register.get(name)
+        if reason_register is not None:
+            if self.rin_supplied.get(reason_register, False) and reason_register in self.rin_value:
+                value = self.rin_value[reason_register]
+                if isinstance(value, str):
+                    try:
+                        if value.startswith('&'):
+                            value = int(value[1:], 16)
+                        elif value.startswith('0x'):
+                            value = int(value[2:], 16)
+                        elif value.startswith('%'):
+                            value = int(value[1:], 2)
+                        else:
+                            value = int(value)
+                    except Exception:
+                        value = None
+                if isinstance(value, int):
+                    name = "%s %i" % (name, value)
+        proc = subprocess.run(["riscos-prm", "--summary", "--no-tables", name],
                               timeout=self.process_timeout,
                               capture_output=True,
                               encoding='utf-8')
@@ -249,36 +316,36 @@ def hover(ls: LanguageServer, params: types.HoverParams):
 
     try:
         line = document.lines[pos.line].rstrip()
-        logging.info("Line: %s" %(line,))
+        logging.debug("Line: %s" %(line,))
     except IndexError:
-        logging.info("No line")
+        logging.debug("No line")
         return None
 
     # We want to try to find the position within the line.
-    logging.info("pos=%r" % (pos,))
+    logging.debug("pos=%r" % (pos,))
     try:
         word = document.word_at_position(pos, swi_match_left_re, swi_match_right_re)
-        logging.info("word=%r" % (word,))
+        logging.debug("word=%r" % (word,))
     except IndexError:
-        logging.info("No word")
+        logging.debug("No word")
         return None
 
     if '_' not in word:
-        logging.info("Not a SWI call (no _ in word)")
+        logging.debug("Not a SWI call (no _ in word)")
         return None
 
     try:
         start_pos = line.index(word)
         end_pos = start_pos + len(word)
     except IndexError:
-        logging.info("Cannot get range of word")
+        logging.debug("Cannot get range of word")
         return None
 
     if word.startswith('X'):
         word = word[1:]
     parts = word.split('_')
     if len(parts) > 2:
-        logging.info("Not a SWI call (multiple _ in word)")
+        logging.debug("Not a SWI call (multiple _ in word)")
         return None
 
     swi_name = word
@@ -303,5 +370,5 @@ def hover(ls: LanguageServer, params: types.HoverParams):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    logging.basicConfig(level=logging.DEBUG , format="%(message)s")
     start_server(server)
