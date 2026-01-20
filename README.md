@@ -58,17 +58,28 @@ code is being called.
 
 ### C: _swix
 
-The `_swix` form of SWI calls will attempt to look up the
+The `_swix` form of SWI calls is recognised when you hover over
+it. The server will attempt to look up the
 interfaces using the flags (`_IN` and `_INR`) supplied, together
 with the parameters.
 
+If you use `_swix(<swi>,` and trigger a completion (ctrl-space
+in some editors) a completion will be offered for the SWI
+interface.
+
 ### BASIC: SYS
 
-The `SYS` form of SWI calls will attempt to look up the
-interfaces using the following parameters after the SWI
-name.
+The `SYS` form of SWI calls is recognised when you hover over
+it. The server will attempt to look up the interfaces using the
+following parameters after the SWI name.
+
+If you use `SYS "<swi>"` and trigger a completion (ctrl-space
+in some editors) a completion will be offered for the SWI
+interface.
+
 
 ### Assembler: SWI
 
 The `SWI` form of SWI call will only look up the SWI name
-and does not currently infer any reason codes.
+and does not currently infer any reason codes when you hover
+over it.

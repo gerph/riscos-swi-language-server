@@ -1,0 +1,10 @@
+/* An exampe C program */
+
+#include <stdio.h>
+
+int main(void)
+{
+    _swix(ColourTrans_GenerateTable,
+    _swix(DragASprite_Start,
+    return 0;
+}

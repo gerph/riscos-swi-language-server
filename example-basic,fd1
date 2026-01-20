@@ -1,0 +1,8 @@
+REM>Example
+REM
+REM An example BASIC program.
+
+SYS "Font_FindFont"
+SYS "Draw_Stroke"
+SYS "Wimp_LoadTemplate"
+SYS "XOS_CLI"
