@@ -15,6 +15,9 @@ from pygls.cli import start_server
 from pygls.lsp.server import LanguageServer
 from pygls.workspace import TextDocument
 
+import swi_conditions
+
+
 server = LanguageServer("riscos-swis", "v1")
 
 #print = lambda msg: server.log_trace(params=types.LogTraceParams(msg))
@@ -25,6 +28,7 @@ swi_match_left_re = re.compile(r'X?[A-Z][A-Za-z0-9_]*$')
 swi_match_right_re = re.compile(r'^[A-Za-z0-9_]*')
 
 # _swix(swi, flags, ...)
+swix_call_re = re.compile(r'_swix?\s*\(\s*(X?[A-Z][A-Za-z0-9_]*)$')
 swix_before_re = re.compile(r'_swix?\s*\(\s*$')
 swix_after_re = re.compile(r'\s*, ((?:_INR?\(\s*[\d,]+\s*\)|_OUTR?\(\s*[\d,]+\s*\)|\d+|0x[0-9A-Fa-f]+|[+|]|\s+)+)(,\s*|\))')
 swix_inout_re = re.compile(r'_(?:IN|OUT)\(\s*(\d+)\s*\)')
@@ -33,6 +37,7 @@ swix_params_nobrackets_re = re.compile(r'^\s*([^(),]+?)\s*([,)])(.*)')
 swix_params_simplebrackets_re = re.compile(r'^\s*\(\s*([^(),]+?)\s*\)\s*([,)])(.*)')
 
 # SYS "swi", regs... TO regs
+sys_call_re = re.compile(r'SYS *"(X?[A-Z][A-Za-z0-9_]*)"$')
 sys_before_re = re.compile(r'SYS *"?$')
 sys_after_re = re.compile(r'^"')
 sys_params_nobrackets_re = re.compile(r'^\s*([^(),:;]*?)\s*([,:;]|TO|$)(.*)')
@@ -299,10 +304,13 @@ class SWICall:
                         value = None
                 if isinstance(value, int):
                     name = "%s %i" % (name, value)
-        proc = subprocess.run(["riscos-prm", "--summary", "--no-tables", name],
-                              timeout=self.process_timeout,
-                              capture_output=True,
-                              encoding='utf-8')
+        try:
+            proc = subprocess.run(["riscos-prm", "--summary", "--no-tables", name],
+                                  timeout=self.process_timeout,
+                                  capture_output=True,
+                                  encoding='utf-8')
+        except subprocess.TimeoutExpired:
+            return None
         if proc.returncode != 0:
             return None
         return proc.stdout
@@ -369,6 +377,117 @@ def hover(ls: LanguageServer, params: types.HoverParams):
     )
 
 
+@server.feature(
+    types.TEXT_DOCUMENT_COMPLETION,
+    types.CompletionOptions(trigger_characters=","),
+)
+def swi_completions(params: types.CompletionParams):
+    document = server.workspace.get_text_document(params.text_document.uri)
+    current_line = document.lines[params.position.line].rstrip()
+    logging.info("Completion for line: %s" % (current_line,))
+
+    if params.position.character != len(current_line) and len(current_line) > 5:
+        # We'll only handle this if we're at the end of the line.
+        return []
+
+    has_comma = False
+    if current_line[-1] == ',':
+        current_line = current_line[:-1]
+        has_comma = True
+
+    match = swix_call_re.search(current_line)
+    if match:
+        name = match.group(1)
+        logging.info("Completion for _swix '%s'" % (name,))
+        return completion_swix(document, current_line, name, has_comma)
+
+    match = sys_call_re.search(current_line)
+    if match:
+        name = match.group(1)
+        logging.info("Completion for SYS \"%s\"" % (name,))
+        return completion_sys(document, current_line, name, has_comma)
+    return []
+
+
+def completion_swix(document, current_line, swi, has_comma):
+    # We now know that this is:
+    #    _swix(<swi>,<cursor here>
+
+    swix = swi_conditions.lookup(swi)
+    if not swix:
+        return []
+
+    completion = []
+    if not has_comma:
+        completion.append(',')
+    completion.extend([' ', '|'.join(swix['flags'])])
+    if swix['ins']:
+        completion.append(', ')
+        completion.extend(', '.join(inr['cvar'] for inr in swix['ins']))
+    if swix['outs']:
+        completion.append(', ')
+        completion.extend(', '.join(outr['cvar'] for outr in swix['outs']))
+    completion.append(');')
+
+    regs = swix['inrange']
+    if swix['outrange']:
+        if regs:
+            regs += ' => %s' % (swix['outrange'],)
+        else:
+            regs = '=> %s' % (swix['outrange'],)
+
+    return [
+        types.CompletionItem(insert_text=''.join(completion), label="SWI invocation (%s)" % (regs,))
+    ]
+
+
+def completion_sys(document, current_line, swi, has_comma):
+    # We now know that this is:
+    #    SYS "<swi>",<cursor here>
+
+    swix = swi_conditions.lookup(swi)
+    if not swix:
+        return []
+
+    completion = []
+    if not has_comma:
+        completion.append(',')
+    if swix['ins']:
+        rn = 0
+        for arg in swix['ins']:
+            if rn < arg['reg']:
+                completion.append(',' * (arg['reg'] - rn))
+                rn = arg['reg']
+            completion.append(' ')
+            completion.append(arg['bvar'])
+    if swix['outs']:
+        completion.append(' TO')
+        rn = 0
+        for arg in swix['outs']:
+            if rn < arg['reg']:
+                if rn == 0:
+                    completion.append(' ')
+                completion.append(',' * (arg['reg'] - rn))
+                rn = arg['reg']
+            completion.append(' ')
+            completion.append(arg['bvar'])
+    if swi.startswith("X"):
+        if not swix['outs']:
+            completion.append(' TO')
+        completion.extend(' ; flags%')
+
+    regs = swix['inrange']
+    if swix['outrange']:
+        if regs:
+            regs += ' => %s' % (swix['outrange'],)
+        else:
+            regs = '=> %s' % (swix['outrange'],)
+
+    return [
+        types.CompletionItem(insert_text=''.join(completion), label="SWI invocation (%s)" % (regs,))
+    ]
+
+
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.DEBUG , format="%(message)s")
+    logging.basicConfig(level=logging.INFO , format="%(message)s")
     start_server(server)
