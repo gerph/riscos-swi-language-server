@@ -67,9 +67,9 @@ To configure the language server with VSCode...
 * Go to its configuration (the cog in the extension page).
 * Enter the following settings in the configuration:
     * Server Command: `riscos-swi-lsp`
-    * Server Command arguments: <no configuration>
-    * Server Environment variables: <no configuration>
-    * Server Initialisation options: <no configuration>
+    * Server Command arguments: (no configuration)
+    * Server Environment variables: (no configuration)
+    * Server Initialisation options: (no configuration)
     * Server Language ID: `c`
 
 * Type `_swix(<SWINAME>,` to get completions. Due to the implementation, a closing bracket is inserted after the first opening bracket, and must be deleted before entering the SWI name, as this is not recognised by the LSP. This bug will be addressed in a later version.
