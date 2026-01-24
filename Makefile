@@ -19,6 +19,7 @@ clean:
 	find . -name '__pycache__' -delete
 
 package: setup.py
+	rm -rf dist
 	python setup.py sdist
 
 setup.py: project.config setup.py.template
