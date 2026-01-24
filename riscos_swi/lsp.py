@@ -15,7 +15,7 @@ from pygls.cli import start_server
 from pygls.lsp.server import LanguageServer
 from pygls.workspace import TextDocument
 
-import swi_conditions
+from . import swi_conditions
 
 
 server = LanguageServer("riscos-swis", "v1")
@@ -488,6 +488,10 @@ def completion_sys(document, current_line, swi, has_comma):
     ]
 
 
-if __name__ == "__main__":
+def main():
     logging.basicConfig(level=logging.INFO , format="%(message)s")
     start_server(server)
+
+
+if __name__ == "__main__":
+    main()

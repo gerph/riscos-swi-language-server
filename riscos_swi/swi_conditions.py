@@ -6,7 +6,7 @@ parameters in a debugger. It has a little more information than we want.
 Plus it's keyed by the SWI number. We need keying by the SWI name.
 """
 
-import swi_conditions_data
+from . import swi_conditions_data
 
 
 def meaning_to_cname(meaning, entry):

@@ -31,7 +31,7 @@ To configure the language server for use with SublimeText...
         {
             "riscos-swis": {
                 "command": [
-                    "...path-to.../riscos-swi-ls.py",
+                    "riscos-swi-lsp",
                     "--tcp",
                     "--port", "9988"
                 ],
