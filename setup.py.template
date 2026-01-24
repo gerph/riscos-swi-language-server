@@ -21,7 +21,7 @@ with open(path.join(here, 'README.md'), encoding='utf-8') as f:
 
 
 setup(
-    name = 'riscos-swi',
+    name = 'riscos-swi-lsp',
     packages = ['riscos_swi'],
     version = "0.0.0",
     license='MIT',
@@ -32,7 +32,7 @@ setup(
     author_email = 'gerph@gerph.org',
     url = 'https://github.com/gerph/riscos-swi-language-server',
     keywords = ['lsp', 'riscos'],
-    entry_points={ 'console_scripts': ['riscos-swi-lsp = riscos_swi.__main__:main'] },
+    entry_points={ 'console_scripts': ['riscos-swi-lsp = riscos_swi.lsp:main'] },
     install_requires= [
             'lsprotocol>=2025.0.0',
             'pygls>=2.0.0'
