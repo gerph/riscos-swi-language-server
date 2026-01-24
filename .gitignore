@@ -1,5 +1,5 @@
 *.pyc
 build/
 dist/
-riscos_swi.egg-info/
+riscos_swi_lsp.egg-info/
 setup.py
