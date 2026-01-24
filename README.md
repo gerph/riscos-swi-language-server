@@ -12,7 +12,14 @@ There are LSPs for many languages and file formats. There’s a good chance that
 
 The RISC OS SWI language server relies on information provided
 by the `riscos-prm` tool. This tool must be installed on your
-path.
+path for the help to work well; without it, only part of the functionality will be
+available.
+
+## Obtaining the server
+
+* Download the latest release package from the Releases on GitHub.
+* Use `pip3 install riscos-swi-lsp-0.1.18.tar.gz`.
+* The LSP server command is `riscos-swi-lsp` when you need to configure your editor.
 
 ## Installation
 
@@ -45,6 +52,28 @@ To configure the language server for use with SublimeText...
 Update the `command` section to point to the source from
 this repository. You will need to have the `pygls` package
 installed.
+
+* Use `ctrl-space` to trigger the SWI insertion.
+* Hover over the SWI name for help.
+
+
+### VSCode
+
+To configure the language server with VSCode...
+
+* Go to the marketplace inside VSCode.
+* Search for 'Generic LSP Client v2'
+* Install this extension.
+* Go to its configuration (the cog in the extension page).
+* Enter the following settings in the configuration:
+    * Server Command: `riscos-swi-lsp`
+    * Server Command arguments: <no configuration>
+    * Server Environment variables: <no configuration>
+    * Server Initialisation options: <no configuration>
+    * Server Language ID: `c`
+
+* Type `_swix(<SWINAME>,` to get completions. Due to the implementation, a closing bracket is inserted after the first opening bracket, and must be deleted before entering the SWI name, as this is not recognised by the LSP. This bug will be addressed in a later version.
+* Hover over the SWI name for help.
 
 
 ## Recognised invocations
