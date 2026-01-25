@@ -11,9 +11,8 @@ There are LSPs for many languages and file formats. There’s a good chance that
 ## Pre-requisites
 
 The RISC OS SWI language server relies on information provided
-by the `riscos-prm` tool. This tool must be installed on your
-path for the help to work well; without it, only part of the functionality will be
-available.
+by the `riscos-prm` tool for full information. If this tool is not installed, we will
+use an internal database of the SWI calls.
 
 ## Obtaining the server
 
@@ -72,7 +71,7 @@ To configure the language server with VSCode...
     * Server Initialisation options: (no configuration)
     * Server Language ID: `c`
 
-* Type `_swix(<SWINAME>,` to get completions. Due to the implementation, a closing bracket is inserted after the first opening bracket, and must be deleted before entering the SWI name, as this is not recognised by the LSP. This bug will be addressed in a later version.
+* Type `_swix(<SWINAME>,` to get completions.
 * Hover over the SWI name for help.
 
 
