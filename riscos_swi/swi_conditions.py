@@ -137,12 +137,16 @@ def prepare_swix():
             swi = condition['label']
             swix_data[swi] = {
                     'swi': swi,
+                    'swinum': swinum,
                     'desc': condition.get('description'),
                     'flags': flags,
                     'ins': inparams,
                     'outs': outparams,
                     'inrange': describe_range([r['reg'] for r in inparams]),
                     'outrange': describe_range([r['reg'] for r in outparams]),
+                    # The full data is also linked, both as the full list and the primary condition
+                    'conditions': conditions,
+                    'primary': condition,
                 }
 
     return swix_data

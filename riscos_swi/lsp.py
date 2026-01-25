@@ -276,6 +276,57 @@ class SWICall:
                 else:
                     break
 
+    def markdown_prm(self, name, reason_register, reason_value):
+        try:
+            if reason_value:
+                arg = "%s %i" % (name, reason_value)
+            else:
+                arg = name
+            proc = subprocess.run(["riscos-prm", "--summary", "--no-tables", arg],
+                                  timeout=self.process_timeout,
+                                  capture_output=True,
+                                  encoding='utf-8')
+        except subprocess.TimeoutExpired:
+            return None
+        if proc.returncode != 0:
+            return None
+        return proc.stdout
+
+    def markdown_internal(self, name, reason_register, reason_value):
+        swi_data = swi_conditions.swix_data.get(name)
+        if not swi_data:
+            # No information known
+            return None
+
+        # Format the data we got:
+        condition = swi_data['primary']
+        # Data looks like this
+        #   {'label': 'OS_ReadC',
+        #    'description': 'Reads a character from the input stream',
+        #    'entry': {},
+        #    'exit': {0: "c"}}],
+        lines = []
+        lines.append("# %s (&%X)" % (swi_data['swi'], swi_data['swinum']))
+        if 'description' in condition:
+            lines.append("")
+            lines.append("*%s*" % (condition['description'],))
+
+        if condition['entry']:
+            lines.append("")
+            lines.append("On entry:")
+            lines.append("")
+            for regnum, field in condition['entry'].items():
+                lines.append("* R%i = %s" % (regnum, field))
+
+        if condition['exit']:
+            lines.append("")
+            lines.append("On exit:")
+            lines.append("")
+            for regnum, field in condition['entry'].items():
+                lines.append("* R%i = %s" % (regnum, field))
+
+        return "\n".join(lines)
+
     def markdown(self):
         """
         Return the markdown text to use for this SWI call.
@@ -287,6 +338,7 @@ class SWICall:
         """
         name = self.name
         reason_register = swi_reason_code_register.get(name)
+        reason_value = None
         if reason_register is not None:
             if self.rin_supplied.get(reason_register, False) and reason_register in self.rin_value:
                 value = self.rin_value[reason_register]
@@ -303,17 +355,11 @@ class SWICall:
                     except Exception:
                         value = None
                 if isinstance(value, int):
-                    name = "%s %i" % (name, value)
-        try:
-            proc = subprocess.run(["riscos-prm", "--summary", "--no-tables", name],
-                                  timeout=self.process_timeout,
-                                  capture_output=True,
-                                  encoding='utf-8')
-        except subprocess.TimeoutExpired:
-            return None
-        if proc.returncode != 0:
-            return None
-        return proc.stdout
+                    reason_value = value
+        result = self.markdown_prm(name, reason_register, reason_value)
+        if not result:
+            result = self.markdown_internal(name, reason_register, reason_value)
+        return result
 
 
 @server.feature(types.TEXT_DOCUMENT_HOVER)
@@ -382,13 +428,16 @@ def hover(ls: LanguageServer, params: types.HoverParams):
     types.CompletionOptions(trigger_characters=","),
 )
 def swi_completions(params: types.CompletionParams):
+    logging.info("Completion for position: %s, %s" % (params.position.character, params.position.line))
+    if params.position.character < 6:
+        # We'll only handle this if we have at least a few characters in the line
+        return []
+
     document = server.workspace.get_text_document(params.text_document.uri)
     current_line = document.lines[params.position.line].rstrip()
     logging.info("Completion for line: %s" % (current_line,))
 
-    if params.position.character != len(current_line) and len(current_line) > 5:
-        # We'll only handle this if we're at the end of the line.
-        return []
+    current_line = current_line[:params.position.character]
 
     has_comma = False
     if current_line[-1] == ',':
