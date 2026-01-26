@@ -36,21 +36,22 @@ To configure the language server for use with SublimeText...
     "clients":
         {
             "riscos-swis": {
+                "enabled": false,
                 "command": [
                     "riscos-swi-lsp",
-                    "--tcp",
-                    "--port", "9988"
                 ],
                 "selector": "source.c|source.bbcbasic|source.asm.arm",
-                "tcp_port": 9988,
             },
         }
 }
 ```
 
-Update the `command` section to point to the source from
-this repository. You will need to have the `pygls` package
-installed.
+* In a project you wish to use the server wish, you must use enable the LSP
+  server - go to the Tools menu -> LSP -> Enable Languages Server In Project...
+  and select the `riscos-swi` server.
+* OR enable the server globally by settings the `enabled` configuration to `true`.
+
+To trigger the language server:
 
 * Use `ctrl-space` to trigger the SWI insertion.
 * Hover over the SWI name for help.
@@ -73,6 +74,11 @@ To configure the language server with VSCode...
 
 * Type `_swix(<SWINAME>,` to get completions.
 * Hover over the SWI name for help.
+
+### Other editors
+
+Please submit an issue or pull request with details of the configuration,
+to help others!
 
 
 ## Recognised invocations
