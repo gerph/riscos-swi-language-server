@@ -12,7 +12,7 @@
 #	- `make tests`
 #
 
-VERSION = $(shell eval "$$(tools/ci-vars)" ; echo $$CI_BRANCH_VERSION | sed -E -e 's/\.([a-zA-Z])/+\1/')
+VERSION = $(shell eval "$$(tools/ci-vars)" ; echo $$CI_BRANCH_VERSION | sed -E -e 's/[^A-Za-z0-9.+~]+/./g' -e 's/\.([a-zA-Z])/+\1/')
 
 clean:
 	find . -name '*.pyc' -delete
